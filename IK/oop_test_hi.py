@@ -246,8 +246,8 @@ class SpotMicroController:
         self.touch_detected = False
         self.last_touch_time = 0
         self.touch_sequence_step = 0  # 0: none, 1: stopped, 2: sitting, 3: paw given
-        self.paw_hold_start_time = 0  # Timer for holding paw
-        self.paw_holding = False  # Flag for 10-second paw hold
+        self.paw_hold_start_time = 0  # timer for holding paw
+        self.paw_holding = False  # flag for paw hold
 
         # == Camera Setup ==
         self.camera = None
@@ -265,7 +265,7 @@ class SpotMicroController:
         self.photos_dir = "/home//rpi//Desktop//ik//photos"
         os.makedirs(self.photos_dir, exist_ok=True)
 
-        # == RL Environment Logging ==
+        # == Logging ==
         self.log_file = "/home//rpi//Desktop//ik//rl_environment_log.csv"
         self.init_logging()
 
@@ -353,24 +353,17 @@ class SpotMicroController:
             self.touch_detected = False
 
     def handle_obstacle_avoidance(self):
-        """Handle obstacle avoidance - turn continuously, poll sensors every 5 seconds.
-        
-        Logic:
-        1. Going forward, detects obstacle within critical radius (20cm) -> starts turning
-        2. While turning, polls read_sensors() every 5 seconds without stopping
-        3. If obstacle is NOT within critical radius (20cm) -> stops turning, goes forward
-        """
-        # Initialize obstacle avoidance state if not present
+
         if not hasattr(self, 'avoiding_obstacle'):
             self.avoiding_obstacle = False
             self.avoidance_turn_direction = None
             self.last_avoidance_sensor_check = 0
 
-        # Critical obstacle threshold
+        # obstacle threshold
         obstacle_threshold = 20  # cm
 
         if self.avoiding_obstacle:
-            # Already turning - poll sensors every 5 seconds
+            # poll sensors every 5 seconds
             current_time = time()
             if current_time - self.last_avoidance_sensor_check >= 5:
                 self.last_avoidance_sensor_check = current_time
@@ -389,16 +382,13 @@ class SpotMicroController:
                     self.accept_command("stop_walk")
                     self.accept_command("forward")
                 else:
-                    # Obstacle still present - continue turning
                     print(f"Obstacle still present (L={self.last_left_distance:.1f}cm, R={self.last_right_distance:.1f}cm), continuing turn")
                     if self.current_movement_command != self.avoidance_turn_direction:
                         self.accept_command(self.avoidance_turn_direction)
             else:
-                # Between 5-second checks, ensure turn command is still active
                 if self.current_movement_command != self.avoidance_turn_direction:
                     self.accept_command(self.avoidance_turn_direction)
         else:
-            # Not yet avoiding - only process if moving forward
             if self.current_movement_command != "forward":
                 return
 
@@ -425,11 +415,9 @@ class SpotMicroController:
                         self.avoidance_turn_direction = "turn_right"
                     print(f"Obstacle detected on both sides! Turning {self.avoidance_turn_direction} (L={self.last_left_distance:.1f}cm, R={self.last_right_distance:.1f}cm)")
 
-                # Start turning without stopping
                 self.accept_command(self.avoidance_turn_direction)
 
     def handle_touch_event(self):
-        """Handle touch sensor reaction: Stop -> Sit -> Give Paw (hold for 10 seconds)"""
         print(f"Touch detected! Sequence step: {self.touch_sequence_step}")
         current_time = time()
 
@@ -477,13 +465,11 @@ class SpotMicroController:
     # ==================== CAMERA METHODS ====================
 
     def capture_photo(self):
-        """Capture photo using Picamera2 and OpenCV"""
         if not CAMERA_AVAILABLE or self.camera is None:
             print("Camera not available")
             return False
 
         try:
-            # start camera if not already started
             if not self.camera.started:
                 self.camera.start()
                 sleep(0.5)
@@ -496,7 +482,6 @@ class SpotMicroController:
             filename = f"photo_{timestamp}.jpg"
             filepath = os.path.join(self.photos_dir, filename)
 
-            # save photo
             cv2.imwrite(filepath, image_bgr)
             print(f"Photo saved: {filepath}")
 
@@ -508,7 +493,6 @@ class SpotMicroController:
     # ==================== LOGGING METHODS ====================
 
     def init_logging(self):
-        # initialize csv logging for RL
         try:
             with open(self.log_file, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -524,7 +508,6 @@ class SpotMicroController:
             print(f"Error initializing logging: {e}")
 
     def log_state(self, command=""):
-        """Log current robot state to CSV"""
         try:
             # get IMU data
             try:
@@ -724,7 +707,6 @@ class SpotMicroController:
             print("RESET TO NEUTRAL ")
 
         def transition_to_neutral():
-            """Transition from any state to neutral (standing) position"""
             transitions_needed = []
             needs_wait = False
 
@@ -875,7 +857,6 @@ class SpotMicroController:
                         print(f"CG : {'cg stab' if self.cg_stabilization_enabled else 'cg distab'}")
 
                 elif command == "stop":
-                    # Full emergency stop with reset to neutral
                     reset_to_neutral()
                     self.sitting = False
                     self.lying = False
@@ -1088,7 +1069,6 @@ class SpotMicroController:
 
                 elif command == "hi":
                     if self.sitting and self.Free and self.t >= 0.99 and not self.hi_mode:
-                        # From sitting: raise RF paw then wave last servo
                         self.hi_mode = True
                         self.hi_from_sitting = True
                         self.hi_phase = 0
@@ -1098,7 +1078,6 @@ class SpotMicroController:
                         self.current_action = "Hi! (sitting)"
                         print(" HI COMMAND (sitting) ")
                     elif self.Free and not self.sitting and not self.lying and not self.hi_mode:
-                        # From standing: shift body back, raise RF paw, wave, return
                         self.hi_mode = True
                         self.hi_from_sitting = False
                         self.hi_phase = 0
@@ -1142,18 +1121,14 @@ class SpotMicroController:
 
             self.process_console_commands()
 
-            # Sensor Reading (every 10 frames to reduce overhead)
             if self.frame_counter % 10 == 0:
                 self.read_sensors()
 
-                # Handle obstacle avoidance
                 if self.walking or (hasattr(self, 'avoiding_obstacle') and self.avoiding_obstacle):
                     self.handle_obstacle_avoidance()
 
-            #  Check paw hold timer
             self.check_paw_hold_timer()
 
-            #  Logging (every 30 frames)
             if self.frame_counter % 30 == 0:
                 self.log_state()
 
@@ -1183,12 +1158,10 @@ class SpotMicroController:
                 and not self.shifting and not self.pawing and not self.hi_mode) and self.lock:
                 self.lock = False
 
-            #  Movement logic for different states
             if self.walking:
                 self.t = self.t + self.tstep
                 self.trec = int(self.t) + 1
 
-                # process movement commands
                 self.DIR_FORWARD = pi / 2
                 self.DIR_BACKWARD = 3 * pi / 2
                 self.DIR_LEFT = pi
@@ -1281,7 +1254,7 @@ class SpotMicroController:
                         self.tstep = self.tstep4
                         self._strafe_trot_applied = False
 
-                # Execute walking command
+                # execute walking command
                 walk_height = self.b_height + 50
 
                 self.pos = self.Spot.start_walk_stop(self.track, self.x_offset, self.steering, self.walking_direction, self.cw,
@@ -1373,7 +1346,6 @@ class SpotMicroController:
                 end_frame_pos = [0, alpha_sitting, 0, x_end_sitting, 0, z_end_sitting]
 
 
-                # Store initial sitting position for pawing reference
                 if (self.t == 1) and (not self.pawing):
                     self.pos_sit_init = copy.deepcopy(self.pos)
                     # pawing
@@ -1384,7 +1356,6 @@ class SpotMicroController:
                     print("Use 'paw_left', 'paw_right', 'paw_down' commands to control paws")
 
                 if self.stop:
-                    # Standing up - go from sitting position to standing
                     self.pos = self.Spot.moving(1 - self.t, end_frame_pos, start_frame_pos, self.pos)
                     self.t = self.t - 4 * self.tstep
                     if self.t <= 0:
@@ -1401,7 +1372,6 @@ class SpotMicroController:
                         print("STANDING COMPLETED")
                 else:
                     if self.t < 1:
-                        # Sitting down - go from start position to sitting position
                         self.pos = self.Spot.moving(self.t, start_frame_pos, end_frame_pos, self.pos)
                         #test correction
                         if self.t > 0.5:
@@ -1424,7 +1394,7 @@ class SpotMicroController:
                         self.pos[3] = self.pos_sit_init[3] + (L_paw*cos(alpha_pawing)-self.pos_sit_init[3])*(self.joypar+1)/2
                         self.pos[5] = self.pos_sit_init[5] + (-self.Spot.d-L_paw*sin(alpha_pawing)-self.pos_sit_init[5])*(self.joypar+1)/2
 
-                        # Left front leg pawing -
+                        # Left front leg pawing 
                         self.pos[0] = self.pos_sit_init[0] + (L_paw*cos(alpha_pawing)-self.pos_sit_init[0])*(self.joypal+1)/2
                         self.pos[2] = self.pos_sit_init[2] + (-self.Spot.d-L_paw*sin(alpha_pawing)-self.pos_sit_init[2])*(self.joypal+1)/2
 
@@ -2111,7 +2081,6 @@ class SpotMicroController:
     # ==================== CLEANUP ====================
 
     def cleanup(self):
-        """Clean up resources on exit"""
         print("Cleaning up resources")
 
         # close TCP server
