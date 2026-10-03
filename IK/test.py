@@ -492,7 +492,7 @@ class SpotMicroController:
     # ==================== LOGGING METHODS ====================
 
     def make_log_path(self):
-        """Выбрать папку для лога (создать при необходимости) и вернуть путь к новому CSV-файлу."""
+        #create logging path
         candidates = [
             "/home/rpi/Desktop/ik",
             os.path.join(os.path.expanduser("~"), "Desktop", "ik"),
@@ -506,10 +506,10 @@ class SpotMicroController:
                     return os.path.join(folder, name)
             except Exception as e:
                 print(f"Log folder {folder} unavailable: {e}")
-        return "sensor_log.csv"  # крайний случай: текущая рабочая папка
+        return "sensor_log.csv" 
 
     def init_logging(self):
-        """Создать новый CSV-файл с заголовком (отдельный файл на каждый запуск)."""
+        ##create logging file
         try:
             with open(self.log_file, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -523,7 +523,6 @@ class SpotMicroController:
             print(f"Error initializing logging ({self.log_file}): {e}")
 
     def log_state(self, command=""):
-        """Дописать одну строку: время + показания датчиков."""
         try:
             # IMU
             try:
@@ -534,7 +533,6 @@ class SpotMicroController:
             roll = self.Angle[0] if len(self.Angle) > 0 else 0.0
             pitch = self.Angle[1] if len(self.Angle) > 1 else 0.0
 
-            # Если файла нет (удалили/не создался) - создать заново
             if not os.path.exists(self.log_file):
                 self.init_logging()
 
@@ -559,7 +557,7 @@ class SpotMicroController:
             print(f"Error logging state: {e}")
             traceback.print_exc()
 
-    # ==================== TCP SERVER METHODS ====================
+    # TCP SERVER METHODS 
 
     def start_tcp_server(self):
         #Start TCP server for app control
@@ -573,7 +571,7 @@ class SpotMicroController:
             # change to '127.0.0.1' for local-only access if security is a concern
             self.tcp_server_socket.bind(('0.0.0.0', self.tcp_port))
             self.tcp_server_socket.listen(5)
-            self.tcp_server_socket.settimeout(1.0)  # Non-blocking accept
+            self.tcp_server_socket.settimeout(1.0)  
 
             # start TCP handler thread
             tcp_thread = threading.Thread(target=self.tcp_handler_thread, daemon=True)
@@ -1116,7 +1114,7 @@ class SpotMicroController:
                         "Available commands: walk, sit, lie, twist, pee, stop, forward, backward, left, right, turn_left, turn_right, paw_left, paw_right, paw_down, move, anim, trot, imu, photo, quit")
 
 
-    # ==================== MAIN ROBOTIC CYCLE ====================
+    # MAIN ROBOTIC CYCLE 
 
     def main_loop(self):
         print("Starting main loop... Use console to control the robot.")
