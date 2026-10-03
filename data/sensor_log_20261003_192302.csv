@@ -1,0 +1,2 @@
+time,command,action,left_distance_cm,right_distance_cm,touch,imu_roll,imu_pitch,imu_accel_x,imu_accel_y,imu_accel_z
+2026-10-03 19:23:05,,Shutting down,-1,-1,0,0.0,0.0,0.292,-0.342,10.767
